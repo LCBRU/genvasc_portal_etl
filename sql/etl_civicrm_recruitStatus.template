@@ -1,0 +1,96 @@
+SET @CIVI_DB='${CIVI_CIVIDB_NAME}';
+
+SET @GENVASC_GROUP_ID := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE name = 'GENVASC_recruitment_data');
+SET @GENVASC_TABLE := (SELECT table_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE id = @GENVASC_GROUP_ID);
+SET @GENVASC_ID_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @GENVASC_GROUP_ID AND name = 'GENVASC_ID');
+SET @CASE_STATUS_GROUP_ID := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_option_group WHERE name = 'case_status');
+SET @RECRUITER_RELATIONSHIP_TYPE := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_relationship_type WHERE name_a_b = 'recruited by');
+SET @RECRUITING_SITE_RELATIONSHIP_TYPE := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_relationship_type WHERE name_a_b = 'Recruiting site');
+SET @SUBJECT_GROUP_ID := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE name = 'Contact_IDs');
+SET @SUBJECT_TABLE := (SELECT table_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE id = @SUBJECT_GROUP_ID);
+SET @NHS_NUMBER_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @SUBJECT_GROUP_ID AND name = 'NHS_number');
+SET @PRACTICE_GROUP_ID := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE name = 'GP_Surgery_data');
+SET @PRACTICE_TABLE := (SELECT table_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE id = @PRACTICE_GROUP_ID);
+SET @PRACTICE_CODE_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @PRACTICE_GROUP_ID AND name = 'Practice_code');
+SET @GENVASC_CASE_TYPE := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_case_type WHERE name = 'GENVASC');
+SET @INVOICE_GROUP_ID := (SELECT id FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE name = 'GENVASC_invoice_data');
+SET @INVOICE_TABLE := (SELECT table_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_group WHERE id = @INVOICE_GROUP_ID);
+SET @INVOICE_YEAR_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @INVOICE_GROUP_ID AND name = 'CIVI_FIELD_GENVASC_INVOICE_YEAR');
+SET @INVOICE_QUARTER_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @INVOICE_GROUP_ID AND name = 'CIVI_FIELD_GENVASC_INVOICE_QUARTER');
+SET @INVOICE_REIMBURSED_COL := (SELECT column_name FROM ${CIVI_CIVIDB_NAME}.civicrm_custom_field WHERE custom_group_id = @INVOICE_GROUP_ID AND name = 'CIVI_FIELD_GENVASC_INVOICE_REIMBURSED_STATUS');
+
+SET @RIGHT_NOW=CURDATE();
+
+
+SET @s = CONCAT('
+  SELECT
+       gr.id AS genvasc_port_recruits_id
+     , \'Awaiting processing\' AS status
+     , gr.nhs_number COLLATE utf8_unicode_ci AS nhs_number
+     , NULL AS study_id
+     , gpCustom.', @PRACTICE_CODE_COL, ' AS practice_code
+     , NULL AS first_name
+     , NULL AS last_name
+     , gr.dob AS date_of_birth
+     , gr.contact_id
+     , gr.case_id
+     , NULL AS processed_by
+     , NULL AS processed_date
+     , gr.date_recruited
+     , NULL AS invoice_year
+     , NULL AS invoice_quarter
+     , NULL AS reimbursed_status
+  FROM genvasc_portal_recruits gr
+  JOIN ', @CIVI_DB, '.', @PRACTICE_TABLE, ' gpCustom ON gpCustom.entity_id = gr.practice_id
+  WHERE gr.case_id IS NULL
+      AND gr.delete_reason IS NULL
+      AND gr.date_processed IS NULL
+
+UNION
+
+  SELECT
+       UUID() AS id
+     , cs.name AS status
+     , cids.', @NHS_NUMBER_COL, ' AS nhs_number
+     , gen.', @GENVASC_ID_COL, ' AS study_id
+     , gpCustom.', @PRACTICE_CODE_COL, ' AS practice_code
+     , con.first_name AS first_name
+     , con.last_name AS last_name
+     , con.birth_date AS date_of_birth
+     , con.id AS contact_id
+     , cas.id AS case_id
+     , rel_c.display_name AS processed_by
+     , COALESCE(rel_r.start_date, cas.start_date) AS processed_date
+     , cas.start_date AS date_recruited
+     , inv.', @INVOICE_YEAR_COL , ' AS invoice_year
+     , inv.', @INVOICE_QUARTER_COL , ' AS invoice_quarter
+     , inv.', @INVOICE_REIMBURSED_COL , ' AS reimbursed_status
+  FROM ', @CIVI_DB, '.civicrm_case cas
+  LEFT JOIN ', @CIVI_DB, '.civicrm_option_value cs ON cs.value = cas.status_id
+        AND cs.option_group_id = ', @CASE_STATUS_GROUP_ID, '
+  JOIN ', @CIVI_DB, '.civicrm_case_contact cc ON cc.case_id = cas.id
+  JOIN ', @CIVI_DB, '.civicrm_contact con ON con.id = cc.contact_id 
+  JOIN ', @CIVI_DB, '.', @SUBJECT_TABLE, ' cids ON cids.entity_id = con.id
+  JOIN ', @CIVI_DB, '.civicrm_relationship practiceRel ON practiceRel.case_id = cas.id
+        AND practiceRel.relationship_type_id = ', @RECRUITING_SITE_RELATIONSHIP_TYPE, '
+        AND practiceRel.is_active = 1
+        AND ( practiceRel.end_date IS NULL OR practiceRel.end_date > @RIGHT_NOW)
+        AND ( practiceRel.start_date IS NULL OR practiceRel.start_date <= @RIGHT_NOW)
+  JOIN ', @CIVI_DB, '.', @PRACTICE_TABLE, ' gpCustom ON gpCustom.entity_id = practiceRel.contact_id_b
+  LEFT JOIN ', @CIVI_DB, '.', @GENVASC_TABLE, ' gen ON gen.entity_id = cas.id
+  LEFT JOIN genvasc_portal_recruits gpr ON gpr.case_id = cas.id
+  LEFT JOIN ', @CIVI_DB, '.civicrm_relationship rel_r ON rel_r.case_id = cas.id
+        AND rel_r.relationship_type_id = ', @RECRUITER_RELATIONSHIP_TYPE, ' 
+        AND rel_r.is_active = 1
+        AND ( rel_r.end_date IS NULL OR rel_r.end_date >= @RIGHT_NOW)
+        AND ( rel_r.start_date IS NULL OR rel_r.start_date <= @RIGHT_NOW)
+  LEFT JOIN ', @CIVI_DB, '.civicrm_contact rel_c ON rel_c.id = rel_r.contact_id_b
+  LEFT JOIN ', @CIVI_DB, '.',@INVOICE_TABLE , ' inv ON inv.entity_id = cas.id
+  WHERE cas.case_type_id = ', @GENVASC_CASE_TYPE, '
+      AND LENGTH(TRIM(COALESCE(cids.', @NHS_NUMBER_COL, ', \'\'))) > 0
+      AND con.birth_date IS NOT NULL
+;');
+
+PREPARE q FROM @s;
+EXECUTE q;
+DEALLOCATE PREPARE q;
