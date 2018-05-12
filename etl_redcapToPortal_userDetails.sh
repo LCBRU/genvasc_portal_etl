@@ -9,7 +9,7 @@ echo "$0 Started: $(date)"
 tmpfile=$(mktemp /tmp/etl_user.XXXXXX)
 
 # Extract data
-mysql  -h $RCINT_DB_HOST -u $GGPP_ETL_USER -p$GGPP_ETL_PASSWORD $RCINT_DB_NAME < sql/etl_redcap_userDetails.sql > $tmpfile
+mysql  -h $RCINT_DB_HOST -u $GGPP_ETL_USER -p$GGPP_ETL_PASSWORD $RCINT_DB_NAME < $DIR/sql/etl_redcap_userDetails.sql > $tmpfile
 
 if [ $? -ne 0 ]; then
     log_error "Export Failed" "failed running etl_redcap_userDetails"
@@ -36,7 +36,7 @@ rm "$warningsfile"
 
 # Post Import
 errorsfile='/tmp/etl_user.errors'
-mysql -h $GGPP_DB_HOST -u $GGPP_DB_USER -p$GGPP_DB_PASSWORD $GGPP_DB_NAME < sql/etl_portal_registerUserDetails.sql 2> $errorsfile 
+mysql -h $GGPP_DB_HOST -u $GGPP_DB_USER -p$GGPP_DB_PASSWORD $GGPP_DB_NAME < $DIR/sql/etl_portal_registerUserDetails.sql 2> $errorsfile 
 
 if [ $? -ne 0 ]; then
     errors=`cat $errorsfile`

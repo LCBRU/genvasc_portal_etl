@@ -9,7 +9,7 @@ echo "$0 Started: $(date)"
 tmpfile=$(mktemp /tmp/etl_delegationLog.XXXXXX)
 
 # Extract data
-mysql  -h $RCINT_DB_HOST -u $GGPP_ETL_USER -p$GGPP_ETL_PASSWORD $RCINT_DB_NAME < sql/etl_redcap_delegationLog.sql > $tmpfile
+mysql  -h $RCINT_DB_HOST -u $GGPP_ETL_USER -p$GGPP_ETL_PASSWORD $RCINT_DB_NAME < $DIR/sql/etl_redcap_delegationLog.sql > $tmpfile
 
 if [ $? -ne 0 ]; then
     log_error "Export Failed" "failed running etl_redcap_delegationLog"
