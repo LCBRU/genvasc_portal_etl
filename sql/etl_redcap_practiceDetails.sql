@@ -23,6 +23,8 @@ FROM (
             ) AS address
          , COALESCE(federation_name.name, '') AS federation
          , COALESCE(partners.value, '') AS partners
+         , COALESCE(genvasc_initiated.VALUE, 0) AS genvasc_initiated
+         , COALESCE(practice_status.VALUE, 0) AS practice_status
     FROM    redcap6170_briccsext.redcap_data pn
     JOIN    redcap6170_briccsext.redcap_data pc ON
                 pc.record = pn.record
@@ -72,8 +74,18 @@ FROM (
                 ON federation_name.project_id = federation.project_id
                 AND federation_name.field_name = federation.field_name
                 AND federation_name.value = federation.value
+    LEFT JOIN   redcap6170_briccsext.redcap_data genvasc_initiated ON
+                genvasc_initiated.record = pn.record
+              AND genvasc_initiated.project_id = pn.project_id
+              AND genvasc_initiated.field_name = 'genvasc_initiated'
+    LEFT JOIN   redcap6170_briccsext.redcap_data practice_status ON
+                practice_status.record = pn.record
+              AND practice_status.project_id = pn.project_id
+              AND practice_status.field_name = 'status'
     WHERE
             pn.field_name = 'practice_name'
          AND pn.project_id IN (29, 53)
     GROUP BY pn.record
-) x
+) X
+WHERE X.practice_status IN (0, 1)
+	AND X.genvasc_initiated = 1
