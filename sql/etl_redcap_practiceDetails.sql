@@ -87,5 +87,4 @@ FROM (
          AND pn.project_id IN (29, 53)
     GROUP BY pn.record
 ) X
-WHERE X.practice_status IN (0, 1)
-	AND X.genvasc_initiated = 1
+WHERE X.genvasc_initiated = 1
