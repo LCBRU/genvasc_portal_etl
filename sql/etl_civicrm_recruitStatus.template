@@ -78,7 +78,6 @@ UNION
         AND ( practiceRel.start_date IS NULL OR practiceRel.start_date <= @RIGHT_NOW)
   JOIN ', @CIVI_DB, '.', @PRACTICE_TABLE, ' gpCustom ON gpCustom.entity_id = practiceRel.contact_id_b
   LEFT JOIN ', @CIVI_DB, '.', @GENVASC_TABLE, ' gen ON gen.entity_id = cas.id
-  LEFT JOIN genvasc_portal_recruits gpr ON gpr.case_id = cas.id
   LEFT JOIN ', @CIVI_DB, '.civicrm_relationship rel_r ON rel_r.case_id = cas.id
         AND rel_r.relationship_type_id = ', @RECRUITER_RELATIONSHIP_TYPE, ' 
         AND rel_r.is_active = 1
