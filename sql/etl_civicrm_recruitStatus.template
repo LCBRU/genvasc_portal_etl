@@ -23,7 +23,7 @@ SET @RIGHT_NOW=CURDATE();
 
 
 SET @s = CONCAT('
-  SELECT
+  SELECT DISTINCT
        gr.id AS genvasc_port_recruits_id
      , \'Awaiting processing\' AS status
      , gr.nhs_number COLLATE utf8_unicode_ci AS nhs_number
@@ -48,7 +48,7 @@ SET @s = CONCAT('
 
 UNION
 
-  SELECT
+  SELECT DISTINCT
        UUID() AS id
      , cs.name AS status
      , cids.', @NHS_NUMBER_COL, ' AS nhs_number
